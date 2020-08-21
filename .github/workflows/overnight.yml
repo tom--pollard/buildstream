@@ -1,0 +1,23 @@
+name: overnight
+on: 
+  schedule:
+    - cron: '0 4 * * *'
+
+env:
+  DOCKER_BUILDKIT: 1
+  COMPOSE_DOCKER_CLI_BUILD: 1
+
+jobs:
+  overnight:
+    runs-on: ubuntu-20.04
+    strategy:
+      fail-fast: false
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v2
+        # BuildStream requires tags to be able to find its version.
+        with:
+          fetch-depth: 0
+      - name: run tests
+        run: |
+          docker-compose up --exit-code-from no_cache no_cache
