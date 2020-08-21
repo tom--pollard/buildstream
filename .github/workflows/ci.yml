@@ -20,132 +20,43 @@ on: push
 # - standardize WSL tasks by using GitHub-provided runners
 
 env:
+  BUILDBOX_VERSION: 0.0.14
   CI_IMAGE: registry.gitlab.com/buildstream/buildstream-docker-images/testsuite-fedora:30-master-154893333
   PYTEST_ARGS: --color=yes --integration -n 4
 
 jobs:
-  tests:
-    runs-on: ubuntu-20.04
-    continue-on-error: ${{ matrix.allow-failure || false }}
 
+  tests-mac:
+    runs-on: macos-10.15
     env:
-      CI_IMAGE_PREFIX: registry.gitlab.com/buildstream/buildstream-docker-images/testsuite
-      CI_IMAGE_SUFFIX: master-154893333
-      TOXENV: py36,py6-plugins,py37,py37-plugins,py38,py38-plugins
-      # FIXME: De-duplicate against tox.ini
-      BST_PLUGINS_EXPERIMENTAL_VERSION: 1.93.4
-
-    strategy:
-      fail-fast: false
-      matrix:
-
-        # Main test targets, the name defines the image that will be used as
-        # the base for running tests.
-        test-name:
-          - debian:10
-          - fedora:30
-          - fedora:31
-          - ubuntu:18.04
-          - centos:7.7.1908
-
-        include:
-          # Ensure that tests also pass without `--develop` flag.
-          - test-name: no-usedevelop
-            image-name: fedora:31
-            toxenv: py36-nocover,py37-nocover,py38-nocover
-
-          # Test the master version of some external plugins
-          - test-name: plugins-master
-            image-name: fedora:31
-            bst-plugins-experimental-version: master
-            allow-failure: true
-
+      # Coverage, pytest and multiprocessing don't mix well on MacOS.
+      TOXENV: py37-nocover,py37-plugins-nocover
     steps:
       - name: Check out repository
         uses: actions/checkout@v2
         # BuildStream requires tags to be able to find its version.
         with:
           fetch-depth: 0
-      # XXX: Our run command looks like a monstrosity because we need to
-      # specify `--device /dev/fuse` and there's no way to do that using the
-      # `container` directive directly.
-      # This is also why we have forward environment variables by hand.
-      # TODO: In future, we should find a way to simplify this. See some
-      # relevant discussion at:
-      # https://github.community/t/how-to-run-privileged-docker-container/16431.
-      # XXX: Value of `volume` and `workdir` must match how GitHub
-      # Actions sets up paths.
-      # TODO: Have test user pre-created in the test image.
-      - name: Run tox inside a container
+      - name: Install buildbox-common
         run: |
-          docker run \
-              --privileged \
-              --device /dev/fuse \
-              --env PYTEST_ARGS \
-              --env TOXENV=${{ matrix.toxenv || env.TOXENV }} \
-              --env BST_PLUGINS_EXPERIMENTAL_VERSION=${{ matrix.bst-plugins-experimental-version || env.BST_PLUGINS_EXPERIMENTAL_VERSION }} \
-              --volume /home/runner/work:/__w \
-              --workdir /__w/buildstream/buildstream \
-              "$CI_IMAGE_PREFIX"-${{ matrix.image-name || matrix.test-name }}-"$CI_IMAGE_SUFFIX" \
-              bash -c 'useradd -Um buildstream && chown -R buildstream:buildstream . && su buildstream -c "tox -- $PYTEST_ARGS"'
-
-  tests-fedora-missing-deps:
-    runs-on: ubuntu-20.04
-    container: registry.gitlab.com/buildstream/buildstream-docker-images/testsuite-fedora:30-master-154893333
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v2
-        # BuildStream requires tags to be able to find its version.
-        with:
-          fetch-depth: 0
-      - name: Uninstall Bubblewrap and OSTree
-        # We remove the Bubblewrap and OSTree packages here so that we catch any
-        # codepaths that try to use them. Removing OSTree causes fuse-libs to
-        # disappear unless we mark it as user-installed.
+          brew install cmake protobuf grpc openssl pkgconfig
+          git clone --branch $BUILDBOX_VERSION --depth 1 https://gitlab.com/BuildGrid/buildbox/buildbox-common.git
+          cd buildbox-common
+          cmake -DBUILD_TESTING=OFF -Bbuild -DOPENSSL_ROOT_DIR=/usr/local/opt/openssl
+          make -C build
+          make -C build install
+      - name: Install buildbox-casd
         run: |
-          dnf mark install fuse-libs systemd-udev
-          dnf erase -y bubblewrap ostree
-      - name: Add test user
-        run: |
-          useradd -Um buildstream
-          chown -R buildstream:buildstream .
-      - name: Run tests
-        run: su buildstream -c "tox -- $PYTEST_ARGS"
-
-  mypy:
-    runs-on: ubuntu-20.04
-    container: registry.gitlab.com/buildstream/buildstream-docker-images/testsuite-fedora:30-master-154893333
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v2
-      - name: Run tox inside a container
-        run: tox -e mypy
-
-  lint:
-    runs-on: ubuntu-20.04
-    container: registry.gitlab.com/buildstream/buildstream-docker-images/testsuite-fedora:30-master-154893333
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v2
-      - name: Run tox inside a container
-        run: tox -e format-check,lint
-
-  docs:
-    runs-on: ubuntu-20.04
-    env:
-      BST_FORCE_SESSION_REBUILD: 1
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v2
-        # BuildStream requires tags to be able to find its version.
-        with:
-          fetch-depth: 0
-      - name: Run tox inside a container
-        run: |
-          docker run \
-              --privileged \
-              --device /dev/fuse \
-              --volume /home/runner/work:/__w \
-              --workdir /__w/buildstream/buildstream \
-              $CI_IMAGE \
-              tox -e docs
+          git clone --branch $BUILDBOX_VERSION --depth 1 https://gitlab.com/BuildGrid/buildbox/buildbox-casd.git
+          cd buildbox-casd
+          cmake -DBUILD_TESTING=OFF -Bbuild -DOPENSSL_ROOT_DIR=/usr/local/opt/openssl
+          make -C build
+          make -C build install
+      - name: Install Python 3.7
+        run: brew install python@3.7
+      - name: Install tox
+        run: pip3 install tox
+      - name: Run non-integration tests
+        run:  |
+          export PATH=/usr/local/opt/python@3.7/bin:$PATH
+          tox -- --color=yes
