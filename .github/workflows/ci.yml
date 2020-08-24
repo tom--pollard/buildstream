@@ -28,9 +28,6 @@ jobs:
 
   tests-mac:
     runs-on: macos-10.15
-    env:
-      # Coverage, pytest and multiprocessing don't mix well on MacOS.
-      TOXENV: py37-nocover,py37-plugins-nocover
     steps:
       - name: Check out repository
         uses: actions/checkout@v2
@@ -52,11 +49,7 @@ jobs:
           cmake -DBUILD_TESTING=OFF -Bbuild -DOPENSSL_ROOT_DIR=/usr/local/opt/openssl
           make -C build
           make -C build install
-      - name: Install Python 3.7
-        run: brew install python@3.7
       - name: Install tox
         run: pip3 install tox
       - name: Run non-integration tests
-        run:  |
-          export PATH=/usr/local/opt/python@3.7/bin:$PATH
-          tox -- --color=yes
+        run: tox -- --color=yes --timeout=100
