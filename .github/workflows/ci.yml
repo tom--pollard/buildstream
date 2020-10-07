@@ -79,8 +79,12 @@ jobs:
       - name: Run tox inside a container
         run: |
 
-          cat << EOF > runtests.sh
+          cat << EOF > runtox.sh
           #!/bin/bash
+
+          # Create user
+          useradd -Um buildstream
+          chown -R buildstream:buildstream .
 
           # Diagnostics
           echo "Running diagnostics checks"
@@ -88,12 +92,12 @@ jobs:
           df -h
           tox --version
 
-          # Run tox
+          # Run tox as user, ensure we have a login shell
           echo "Running tests"
-          tox -vvvvv -- $PYTEST_ARGS
+          su buildstream -c '/bin/bash --login -c "tox -vvvvv -- $PYTEST_ARGS"'
           EOF
 
-          chmod +x runtests.sh
+          chmod +x runtox.sh
 
           docker run \
               --privileged \
@@ -104,7 +108,7 @@ jobs:
               --volume /home/runner/work:/__w \
               --workdir /__w/buildstream/buildstream \
               "$CI_IMAGE_PREFIX"-${{ matrix.image-name || matrix.test-name }}-"$CI_IMAGE_SUFFIX" \
-              bash -c 'useradd -Um buildstream && chown -R buildstream:buildstream . && su buildstream -c ./runtests.sh'
+              ./runtox.sh
 
   tests-fedora-missing-deps:
     runs-on: ubuntu-20.04
