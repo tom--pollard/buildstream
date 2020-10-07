@@ -90,7 +90,7 @@ jobs:
 
           # Run tox
           echo "Running tests"
-          tox -- $PYTEST_ARGS
+          tox -vvvvv -- $PYTEST_ARGS
           EOF
 
           chmod +x runtests.sh
