@@ -20,8 +20,8 @@ on: push
 # - standardize WSL tasks by using GitHub-provided runners
 
 env:
-  CI_IMAGE: registry.gitlab.com/buildstream/buildstream-docker-images/testsuite-fedora:30-master-154893333
-  PYTEST_ARGS: --color=yes --integration -n 4
+  CI_IMAGE: registry.gitlab.com/buildstream/buildstream-docker-images/testsuite-fedora:32-master-177137613
+  PYTEST_ARGS: --color=yes --integration
 
 jobs:
   tests:
@@ -30,8 +30,8 @@ jobs:
 
     env:
       CI_IMAGE_PREFIX: registry.gitlab.com/buildstream/buildstream-docker-images/testsuite
-      CI_IMAGE_SUFFIX: master-154893333
-      TOXENV: py36,py6-plugins,py37,py37-plugins,py38,py38-plugins
+      CI_IMAGE_SUFFIX: master-177137613
+      TOXENV: py36,py37,py38-nocover,py36-plugins,py37-plugins,py38-plugins-nocover
       # FIXME: De-duplicate against tox.ini
       BST_PLUGINS_EXPERIMENTAL_VERSION: 1.93.4
 
@@ -43,20 +43,20 @@ jobs:
         # the base for running tests.
         test-name:
           - debian:10
-          - fedora:30
           - fedora:31
+          - fedora:32
           - ubuntu:18.04
           - centos:7.7.1908
 
         include:
           # Ensure that tests also pass without `--develop` flag.
           - test-name: no-usedevelop
-            image-name: fedora:31
+            image-name: fedora:32
             toxenv: py36-nocover,py37-nocover,py38-nocover
 
           # Test the master version of some external plugins
           - test-name: plugins-master
-            image-name: fedora:31
+            image-name: fedora:32
             bst-plugins-experimental-version: master
             allow-failure: true
 
@@ -78,6 +78,27 @@ jobs:
       # TODO: Have test user pre-created in the test image.
       - name: Run tox inside a container
         run: |
+
+          cat << EOF > runtox.sh
+          #!/bin/bash
+
+          # Create user
+          useradd -Um buildstream
+          chown -R buildstream:buildstream .
+
+          # Diagnostics
+          echo "Running diagnostics checks"
+          mount
+          df -h
+          tox --version
+
+          # Run tox as user, ensure we have a login shell
+          echo "Running tests"
+          su buildstream -c '/bin/bash --login -c "tox -vvvvv -- $PYTEST_ARGS"'
+          EOF
+
+          chmod +x runtox.sh
+
           docker run \
               --privileged \
               --device /dev/fuse \
@@ -87,11 +108,11 @@ jobs:
               --volume /home/runner/work:/__w \
               --workdir /__w/buildstream/buildstream \
               "$CI_IMAGE_PREFIX"-${{ matrix.image-name || matrix.test-name }}-"$CI_IMAGE_SUFFIX" \
-              bash -c 'useradd -Um buildstream && chown -R buildstream:buildstream . && su buildstream -c "tox -- $PYTEST_ARGS"'
+              ./runtox.sh
 
   tests-fedora-missing-deps:
     runs-on: ubuntu-20.04
-    container: registry.gitlab.com/buildstream/buildstream-docker-images/testsuite-fedora:30-master-154893333
+    container: registry.gitlab.com/buildstream/buildstream-docker-images/testsuite-fedora:32-master-177137613
     steps:
       - name: Check out repository
         uses: actions/checkout@v2
@@ -114,7 +135,7 @@ jobs:
 
   mypy:
     runs-on: ubuntu-20.04
-    container: registry.gitlab.com/buildstream/buildstream-docker-images/testsuite-fedora:30-master-154893333
+    container: registry.gitlab.com/buildstream/buildstream-docker-images/testsuite-fedora:32-master-177137613
     steps:
       - name: Check out repository
         uses: actions/checkout@v2
@@ -123,7 +144,7 @@ jobs:
 
   lint:
     runs-on: ubuntu-20.04
-    container: registry.gitlab.com/buildstream/buildstream-docker-images/testsuite-fedora:30-master-154893333
+    container: registry.gitlab.com/buildstream/buildstream-docker-images/testsuite-fedora:32-master-177137613
     steps:
       - name: Check out repository
         uses: actions/checkout@v2
