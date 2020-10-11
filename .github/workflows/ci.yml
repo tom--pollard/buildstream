@@ -166,7 +166,15 @@ jobs:
           docker run \
               --privileged \
               --device /dev/fuse \
+              --env BST_FORCE_SESSION_REBUILD \
               --volume /home/runner/work:/__w \
               --workdir /__w/buildstream/buildstream \
               $CI_IMAGE \
               tox -e docs
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: docs
+          path: doc/build/html
+
