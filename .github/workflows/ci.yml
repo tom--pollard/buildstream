@@ -178,3 +178,36 @@ jobs:
           name: docs
           path: doc/build/html
 
+  analysis:
+    runs-on: ubuntu-20.04
+    container: registry.gitlab.com/buildstream/buildstream-docker-images/testsuite-debian:10-master-177137613
+    needs: tests
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v2
+        # BuildStream requires tags to be able to find its version.
+        with:
+          fetch-depth: 0
+      - name: radon
+        run: |
+          # Workaround radon issue not requiring it's dependency
+          pip3 install flake8_polyfill
+          pip3 install radon
+          mkdir analysis
+
+          echo "Calculating Maintainability Index"
+          radon mi -s -j src/buildstream > analysis/mi.json
+          radon mi -s src/buildstream
+
+          echo "Calculating Cyclomatic Complexity"
+          radon cc -a -s -j src/buildstream > analysis/cc.json
+          radon cc -a -s src/buildstream
+
+          echo "Calculating Raw Metrics"
+          radon raw -s -j src/buildstream > analysis/raw.json
+          radon raw -s src/buildstream
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: analysis
+          path: analysis/
