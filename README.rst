@@ -10,8 +10,8 @@ About
 .. image:: https://gitlab.com/BuildStream/buildstream/badges/master/pipeline.svg
    :target: https://gitlab.com/BuildStream/buildstream/commits/master
 
-.. image:: https://gitlab.com/BuildStream/buildstream/badges/master/coverage.svg?job=coverage
-   :target: https://gitlab.com/BuildStream/buildstream/commits/master
+.. image:: https://codecov.io/gh/tom--pollard/buildstream/branch/master/graph/badge.svg
+   :target: https://codecov.io/gh/tom--pollard/buildstream
 
 .. image:: https://img.shields.io/pypi/v/BuildStream.svg
    :target: https://pypi.org/project/BuildStream

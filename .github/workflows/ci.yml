@@ -39,16 +39,20 @@ jobs:
       fail-fast: false
       matrix:
 
-        # Main test targets, the name defines the image that will be used as
-        # the base for running tests.
-        test-name:
-          - debian:10
-          - fedora:31
-          - fedora:32
-          - ubuntu:18.04
-          - centos:7.7.1908
-
         include:
+          # Main test targets, the image-name defines the image that will be used as
+          # the base for running tests.
+          - test-name: test-debian-10
+            image-name: debian:10
+          - test-name: test-fedora-31
+            image-name: fedora:31
+          - test-name: test-fedora-32
+            image-name: fedora:32
+          - test-name: test-ubuntu-18.04
+            image-name: ubuntu:18.04
+          - test-name: test-centos-7.7
+            image-name: centos:7.7.1908
+
           # Ensure that tests also pass without `--develop` flag.
           - test-name: no-usedevelop
             image-name: fedora:32
@@ -105,10 +109,17 @@ jobs:
               --env PYTEST_ARGS \
               --env TOXENV=${{ matrix.toxenv || env.TOXENV }} \
               --env BST_PLUGINS_EXPERIMENTAL_VERSION=${{ matrix.bst-plugins-experimental-version || env.BST_PLUGINS_EXPERIMENTAL_VERSION }} \
+              --env COVERAGE_PREFIX=${{ matrix.test-name}} \
               --volume /home/runner/work:/__w \
               --workdir /__w/buildstream/buildstream \
               "$CI_IMAGE_PREFIX"-${{ matrix.image-name || matrix.test-name }}-"$CI_IMAGE_SUFFIX" \
               ./runtox.sh
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: coverage-reports
+          path: .coverage-reports
 
   tests-fedora-missing-deps:
     runs-on: ubuntu-20.04
@@ -178,3 +189,39 @@ jobs:
           name: docs
           path: doc/build/html
 
+  coverage:
+    runs-on: ubuntu-20.04
+    container: registry.gitlab.com/buildstream/buildstream-docker-images/testsuite-debian:10-master-177137613
+    needs: tests
+    if: github.ref == 'refs/heads/master'
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v2
+        # BuildStream requires tags to be able to find its version.
+        with:
+          fetch-depth: 0
+      - name: Download cached coverage reports
+        uses: actions/download-artifact@v2
+        with:
+          name: coverage-reports
+          path: .coverage-reports/
+      - name: Generate combined coverage report, install codecov deps
+        run: |
+          apt update
+          apt install -y curl
+          cp -a .coverage-reports/ ./coverage-sources
+          tox -e coverage
+          cp -a .coverage-reports/ ./coverage-report
+      - name: codecov xml upload
+        uses: codecov/codecov-action@v1
+        with:
+          file: ./coverage-report/coverage.xml
+          name: test
+          token: 8449f62d-04da-46b8-8e99-f781b253058d
+      - name: Upload coverage artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: coverage
+          path: |
+            coverage-sources/
+            coverage-report/
