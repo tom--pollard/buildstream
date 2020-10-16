@@ -358,6 +358,8 @@ def help_command(ctx, command):
 
     click.echo(command_ctx.command.get_help(command_ctx), err=True)
 
+    click.echo("FOOBAR")
+
     # Hint about available sub commands
     if isinstance(command_ctx.command, click.MultiCommand):
         detail = " "
