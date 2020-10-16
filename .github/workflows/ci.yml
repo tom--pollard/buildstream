@@ -193,6 +193,7 @@ jobs:
     runs-on: ubuntu-20.04
     container: registry.gitlab.com/buildstream/buildstream-docker-images/testsuite-debian:10-master-177137613
     needs: tests
+    # Only run on pushes to master (PR merges result in push event)
     if: github.ref == 'refs/heads/master'
     steps:
       - name: Check out repository
