@@ -193,8 +193,6 @@ jobs:
     runs-on: ubuntu-20.04
     container: registry.gitlab.com/buildstream/buildstream-docker-images/testsuite-debian:10-master-177137613
     needs: tests
-    # Only run on pushes to master (PR merges result in push event)
-    if: github.ref == 'refs/heads/master'
     steps:
       - name: Check out repository
         uses: actions/checkout@v2
@@ -213,12 +211,6 @@ jobs:
           cp -a .coverage-reports/ ./coverage-sources
           tox -e coverage
           cp -a .coverage-reports/ ./coverage-report
-      - name: codecov xml upload
-        uses: codecov/codecov-action@v1
-        with:
-          file: ./coverage-report/coverage.xml
-          name: test
-          token: 8449f62d-04da-46b8-8e99-f781b253058d
       - name: Upload coverage artifacts
         uses: actions/upload-artifact@v2
         with:
@@ -226,3 +218,11 @@ jobs:
           path: |
             coverage-sources/
             coverage-report/
+      - name: codecov xml upload + badge update
+        # Only run on pushes to master (PR merges result in push event)
+        if: github.ref == 'refs/heads/master'
+        uses: codecov/codecov-action@v1
+        with:
+          file: ./coverage-report/coverage.xml
+          name: test
+          token: 8449f62d-04da-46b8-8e99-f781b253058d
