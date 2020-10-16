@@ -224,5 +224,4 @@ jobs:
         uses: codecov/codecov-action@v1
         with:
           file: ./coverage-report/coverage.xml
-          name: test
-          token: 8449f62d-04da-46b8-8e99-f781b253058d
+          name: Coverage Report
