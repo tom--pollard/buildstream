@@ -8,7 +8,6 @@ name: PR Checks
 on: push
 
 # Left to-do:
-# - coverage
 # - publishing docs to gh-pages
 # - persistent artifact cache
 # - overnight jobs
@@ -206,18 +205,22 @@ jobs:
           path: .coverage-reports/
       - name: Generate combined coverage report, install codecov deps
         run: |
-          apt update
-          apt install -y curl
+          apt update && apt install -y curl
           cp -a .coverage-reports/ ./coverage-sources
           tox -e coverage
           cp -a .coverage-reports/ ./coverage-report
-      - name: Upload coverage artifacts
+      - name: Upload final coverage artifacts
         uses: actions/upload-artifact@v2
         with:
           name: coverage
           path: |
             coverage-sources/
             coverage-report/
+      - name: Delete intermediate job coverage artifacts
+        uses: geekyeggo/delete-artifact@v1
+        with:
+          name: coverage-reports
+          failOnError: false
       - name: codecov xml upload + badge update
         # Only run on pushes to master (PR merges result in push event)
         if: github.ref == 'refs/heads/master'
