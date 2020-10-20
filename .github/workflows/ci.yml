@@ -226,3 +226,11 @@ jobs:
         with:
           file: ./coverage-report/coverage.xml
           name: Coverage Report
+  echo:
+    runs-on: ubuntu-20.04
+    container: registry.gitlab.com/buildstream/buildstream-docker-images/testsuite-debian:10-master-177137613
+    needs: tests
+    steps:
+      - name: echo
+        run: |
+          echo "Hello World"
