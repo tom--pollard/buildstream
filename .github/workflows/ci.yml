@@ -221,9 +221,7 @@ jobs:
         with:
           name: coverage-reports
           failOnError: false
-      - name: codecov xml upload + badge update
-        # Only run on pushes to master (PR merges result in push event)
-        if: github.ref == 'refs/heads/master'
+      - name: codecov xml upload + master badge update
         uses: codecov/codecov-action@v1
         with:
           file: ./coverage-report/coverage.xml
