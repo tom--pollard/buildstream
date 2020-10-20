@@ -362,6 +362,10 @@ def help_command(ctx, command):
 
     click.echo("BAR")
 
+    click.echo("FIZZ")
+
+    click.echo("BUZZ")
+
     # Hint about available sub commands
     if isinstance(command_ctx.command, click.MultiCommand):
         detail = " "
