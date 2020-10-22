@@ -10,6 +10,9 @@ About
 .. image:: https://gitlab.com/BuildStream/buildstream/badges/master/pipeline.svg
    :target: https://gitlab.com/BuildStream/buildstream/commits/master
 
+.. image:: https://github.com/tom--pollard/buildstream/workflows/Overnight%20Tests/badge.svg?branch=master
+   :target: https://github.com/tom--pollard/buildstream/actions?query=workflow%3A%22Overnight+Tests%22+branch%3Amaster
+
 .. image:: https://codecov.io/gh/tom--pollard/buildstream/branch/master/graph/badge.svg
    :target: https://codecov.io/gh/tom--pollard/buildstream
 

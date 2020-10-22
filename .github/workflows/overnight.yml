@@ -1,0 +1,126 @@
+name: Overnight Tests
+
+on:
+  schedule:
+    - cron:  '0 0 * * *'
+
+jobs:
+  tests:
+    runs-on: ubuntu-20.04
+    continue-on-error: ${{ matrix.allow-failure || false }}
+
+    env:
+      IMAGE: registry.gitlab.com/buildstream/buildstream-docker-images/testsuite-fedora:32-master-177137613
+      FD_SDK_REF: freedesktop-sdk-20.08beta.1-buildstream2
+      BST_EXT_REF: da0417b62ba47ffdaff985b736907373d14cd2c7
+      PUSH_CERT: ${{ secrets.OVERNIGHT_CACHE_PUSH_CERT }}
+      PUSH_KEY: ${{ secrets.OVERNIGHT_CACHE_PUSH_KEY }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+
+        include:
+          - test-name: overnight-tests
+            config: 'echo -e "artifacts:\n  - url: https://bb-cache.buildstream.build:11002\n    client-cert: "${HOME}/.config/client.crt"\n    client-key: "${HOME}/.config/client.key"\n    push: true" >> "${HOME}/.config/buildstream.conf"'
+            target: fdsdk
+          - test-name: overnight-tests-no-cache
+            config: sed -i '/artifacts:/,+1 d' freedesktop-sdk/project.conf
+            target: fdsdk
+          - test-name: overnight-randomized
+            target: tox
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v2
+        # BuildStream requires tags to be able to find its version.
+        with:
+          fetch-depth: 0
+      # XXX: Our run command looks like a monstrosity because we need to
+      # specify `--device /dev/fuse` and there's no way to do that using the
+      # `container` directive directly.
+      # This is also why we have forward environment variables by hand.
+      # TODO: In future, we should find a way to simplify this. See some
+      # relevant discussion at:
+      # https://github.community/t/how-to-run-privileged-docker-container/16431.
+      # XXX: Value of `volume` and `workdir` must match how GitHub
+      # Actions sets up paths.
+      # TODO: Have test user pre-created in the test image.
+      - name: Run tests inside a container
+        run: |
+
+          cat << EOF > run-fdsdk.sh
+          #!/bin/bash
+
+          # Write config
+          mkdir -p "${HOME}/.config"
+          echo -e "scheduler: \n  fetchers: 2" > "${HOME}/.config/buildstream.conf"
+          echo -e "logging: \n  error-lines: 80" >> "${HOME}/.config/buildstream.conf"
+
+          # Add cache server credentials (optionally applied to config)
+          echo "$PUSH_CERT" > "${HOME}/.config/client.crt"
+          echo "$PUSH_KEY" > "${HOME}/.config/client.key"
+
+          # Install ostree
+          dnf install -y ostree
+
+          # Install pinned BuildStream dependencies, BuildStream from the local repository
+          # and bst-plugins-expeirmental from its repository
+          pip3 install \
+            -r requirements/requirements.txt . \
+            git+https://gitlab.com/buildstream/bst-plugins-experimental.git@${BST_EXT_REF}#egg=bst_plugins_experimental[cargo] \
+
+          # Clone & checkout required FDSDK ref
+          git clone https://gitlab.com/freedesktop-sdk/freedesktop-sdk.git
+          git -C freedesktop-sdk checkout ${FD_SDK_REF}
+
+          # Test specific config
+          ${{ matrix.config }}
+
+          # Print config file to log for reference/debug
+          less -FX "${HOME}/.config/buildstream.conf"
+
+          make -C freedesktop-sdk
+          EOF
+
+          cat << EOF > run-tox.sh
+          #!/bin/bash
+
+          # Create user
+          useradd -Um buildstream
+          chown -R buildstream:buildstream .
+
+          # Diagnostics
+          echo "Running diagnostics checks"
+          mount
+          df -h
+          tox --version
+
+          # Run tox as user, ensure we have a login shell
+          echo "Running tests"
+          # Don't run tests multiprocessed here, the randomized order doesn't like that
+          su buildstream -c '/bin/bash --login -c "tox -vvvvv -e py36-randomized,py37-randomized,py38-randomized-nocover -- --color=yes --integration"'
+          EOF
+
+          # Set scripts exec
+          chmod +x run-fdsdk.sh
+          chmod +x run-tox.sh
+
+          docker run \
+              --privileged \
+              --device /dev/fuse \
+              --env env.BST_EXT_REF \
+              --env env.FD_SDK_REF \
+              --env env.PUSH_CERT \
+              --env env.PUSH_KEY \
+              --volume /home/runner/work:/__w \
+              --workdir /__w/buildstream/buildstream \
+              "$IMAGE" \
+              ./run-${{ matrix.target }}.sh
+
+      - name: Upload logs
+        uses: actions/upload-artifact@v2
+        if: matrix.target == 'fdsdk'
+        with:
+          name: logs
+          path: ~/.cache/buildstream/logs
